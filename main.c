@@ -1,35 +1,37 @@
+/* It moves windows and a bit more.*/
+
 /* TinyWM is written by Nick Welch <mack@incise.org>, 2005.
  *  Window Mover is written by Jien <jienfak@protonmail.com>, 2019.
  * This software is in the public domain
  * and is provided AS IS, with NO WARRANTY. */
 
-/* One day I understood I don't even use many features of DWM, 
-which is really small. Now I want to have REALLY small window manager.
-I want it to be as fast as possible. As small as possible. 
-I want to easy compile it everywhere. Everything what WM should do
-is MANAGING WINDOWS, no FUCKING BARS! If you need bars - 
-write separated program for that. Don't implement it in WM, BITCH. 
-2000 lines are too many. 50 KB with TCC? WHAT?!  50?]
-Are you fucking joking? I need it in smaller! Much smaller.
-So get it! */
+/* WM with all features I really use. Nothing more. */
+/* To make it work well you should implement a few
+	wrappers(My wrappers are in 'github.com/jienfak/etc/aliases'):
+		1) closecurwin : closes current window. 
+		2) menu_cmd : runs input command by shell.
+		3) fallmenu_scripts : runs scripts from '$HOME/.scripts' or something.*/
 
 #include <X11/Xlib.h>
 #include <X11/cursorfont.h> 
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdbool.h>
+#include "defs.h"
 
-#define MODKEY (Mod4Mask)
-#define XKILL_HOTKEY_STR ("Escape")
-#define XMENU_CMD_HOTKEY_STR ("space")
-#define DVORAK_HOTKEY_STR ("Tab")
-#define DVP_HOTKEY_STR ("Return")
-#define QWERTY_HOTKEY_STR ("a")
-#define NATIVE_HOTKEY_STR ("Backspace")
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 
-enum{ MouseWinMoveFlag, MouseWinResizeFlag };
 
+enum{ MouseEmptyFlag,
+	MouseWinMoveFlag,
+	MouseWinResizeFlag,
+	MouseAllWinsMoveFlag,
+	MouseFlagsLength};
+
+void setonlyflag(bool flags[], int len, int flag){
+	for( int i=0 ; i<len ; ++i ){ flags[i] = false ; }
+	flags[flag] = true ;
+}
 unsigned int strkey(Display *dpy, char *str){
 	return XKeysymToKeycode(dpy, XStringToKeysym(str)) ;
 }
@@ -44,6 +46,26 @@ unsigned int grabkey( Display *dpy, Window rw, char *str){
 void grabbutton(Display *dpy, Window rw, int button){
 	XGrabButton( dpy, button, MODKEY, rw, True, ButtonPressMask|ButtonReleaseMask, GrabModeAsync,
           	GrabModeAsync, None, None );
+	XGrabButton( dpy, button, MODKEY|ShiftMask, rw, True, ButtonPressMask|ButtonReleaseMask, GrabModeAsync,
+          	GrabModeAsync, None, None );
+}
+
+void movewinarr(Display *dpy, Window wins[], int len, int xdiff, int ydiff){
+	XWindowAttributes attr;
+	for( int i=0 ; i<len ; ++i ){
+		XGetWindowAttributes(dpy, wins[i], &attr);
+		XMoveWindow(dpy, wins[i], attr.x+xdiff, attr.y+ydiff);
+	}
+}
+
+int moveallwins(Display *dpy, Window rw, int xdiff, int ydiff){
+	Window dw;
+	Window *wins;
+	unsigned int n;
+	if(! XQueryTree(dpy, rw, &dw, &dw,&wins, &n ) ){ return 1; }
+	movewinarr(dpy, wins, n, xdiff, ydiff);
+	XFree(wins);
+	return 0 ;
 }
 
 int main(int argc, char argv[]){
@@ -54,7 +76,7 @@ int main(int argc, char argv[]){
 	/* Cursor shape object. */
 	Cursor cur;
 	int but;
-	bool mouse_flags[] = { false, false } ;
+	bool mouse_flags[MouseFlagsLength] = { false, false } ;
 	Window sw;
 	/* Buffer to get window attributes. */
 	XWindowAttributes attr;
@@ -62,20 +84,28 @@ int main(int argc, char argv[]){
 	XButtonEvent start;
 	/* Buffer for X11 events. */
 	XEvent ev;
+	/* Buffer for key pressing. */
+	unsigned int key,
+		state;
+	/* Buffer for dedlta coordinates. */
+	int xdiff, ydiff;
 
-	if(!(dpy = XOpenDisplay(0x0))) return 1;
+	if(! (dpy = XOpenDisplay(NULL)) ){
+		fprintf(stderr, "%s: Can't open display\n", argv[0]);
+		return EXIT_FAILURE ;
+	}
 
 	rw = DefaultRootWindow(dpy) ;
 
-	/* XGrabKey( dpy, , Mod1Mask, rw,
-          	True, GrabModeAsync, GrabModeAsync ); */
-	/* Main bindings. */
-	unsigned int menu_cmd_key= grabkey(dpy, rw, XMENU_CMD_HOTKEY_STR) ;
-	unsigned int xkill_key = grabkey(dpy, rw, XKILL_HOTKEY_STR) ;
-	unsigned int dvorak_key = grabkey(dpy, rw, DVORAK_HOTKEY_STR) ;
-	unsigned int dvp_key = grabkey(dpy, rw, DVP_HOTKEY_STR) ;
-	unsigned int qwerty_key = grabkey(dpy, rw, QWERTY_HOTKEY_STR) ;
-		unsigned int native_key = grabkey(dpy, rw, NATIVE_HOTKEY_STR) ;
+	/* Application runner and keyboard layout keybindings. */
+	unsigned int menu_cmd_key= grabkey(dpy, rw, XMENU_CMD_HOTKEY_STR) ,
+		dvorak_key = grabkey(dpy, rw, DVORAK_HOTKEY_STR) ,
+		dvp_key = grabkey(dpy, rw, DVP_HOTKEY_STR) ,
+		qwerty_key = grabkey(dpy, rw, QWERTY_HOTKEY_STR) ,
+		native_key = grabkey(dpy, rw, NATIVE_HOTKEY_STR) ,
+		quit_wm_key = grabkey(dpy, rw, QUIT_WM_HOTKEY_STR)
+	;
+	
 
 	/* Mouse bindings. */
 	grabbutton(dpy, rw, 1);
@@ -84,129 +114,164 @@ int main(int argc, char argv[]){
 	grabbutton(dpy, rw, 4);
 	grabbutton(dpy, rw, 5);
 
-	/* Cursor creating. */
+	/* Cursor creating and defining. */
 	cur = XCreateFontCursor(dpy, XC_left_ptr) ;
 	XDefineCursor(dpy, rw, cur); 
 	for(;;){
 		XNextEvent(dpy, &ev);
-		if( ev.type == KeyPress /* && ev.xkey.subwindow != None */ ){
+		switch( ev.type ){
+		case KeyPress :
 			/* Super key is pressed. */ 
-			system("xmodmap $XMODMAP &");
-			unsigned int key = ev.xkey.keycode ;
+			key = ev.xkey.keycode ;
+			sw = ev.xkey.subwindow ;
 			if( key == menu_cmd_key){
 				/* The only way to call programs. */
 				system("menu_cmd &");
-			}else if( key == xkill_key ){
-				/* The only way to kill programs. */
-
 			}else if( key == dvorak_key ){
-				system("setxkbmap $DVORAK_KEYBOARD_LAYOUT &");
+				system("setxkbmap $DVORAK_KEYBOARD_LAYOUT ; xmodmap $XMODMAP ");
 			}else if( key == dvp_key ){
-				system("setxkbmap $DVP_KEYBOARD_LAYOUT &");
+				system("setxkbmap $DVP_KEYBOARD_LAYOUT ; xmodmap $XMODMAP ");
 			}else if( key == native_key ){
-				system("setxkbmap $NATIVE_KEYBOARD_LAYOUT &");
+				system("setxkbmap $NATIVE_KEYBOARD_LAYOUT ; xmodmap $XMODMAP ");
 			}else if( key == qwerty_key ){
-				system("setxkbmap $QWERTY_KEYBOARD_LAYOUT &");
+				system("setxkbmap $QWERTY_KEYBOARD_LAYOUT ; xmodmap $XMODMAP");
+			}else if( key == quit_wm_key ){
+				goto success_exit ;
 			}
+		break;
 
-		}else if(ev.type == ButtonPress ){
+		case ButtonPress :
 			but = ev.xbutton.button ;
 			sw = ev.xbutton.subwindow ;
-			XGrabPointer( dpy, sw, True,
-			PointerMotionMask|ButtonReleaseMask, GrabModeAsync,
-				GrabModeAsync, None, cur, CurrentTime );
-			XGetWindowAttributes(dpy, sw, &attr);
-			start = ev.xbutton;
+			state = ev.xbutton.state ;
+			if(sw != None){
+				XGrabPointer( dpy, sw, True,
+					PointerMotionMask|ButtonReleaseMask, GrabModeAsync,
+					GrabModeAsync, None, cur, CurrentTime );
+				XGetWindowAttributes(dpy, sw, &attr);
+			}
+			start = ev.xbutton ;
 			switch( but ){
-				case 1 :
-					if( sw != None ){
-						mouse_flags[MouseWinMoveFlag] = true ;
-						mouse_flags[MouseWinResizeFlag] = false ;
-					}else{
-					}
-				break;
+			case 1 :
+				if( sw != None ){
+					setonlyflag(mouse_flags, MouseFlagsLength, MouseWinMoveFlag);
+				}else{
+					setonlyflag(mouse_flags, MouseFlagsLength, MouseAllWinsMoveFlag);
+				}
+			break;
 
-				case 2 :
-					if( sw != None ){
-						system("closecurwin");
+			case 2 :
+				if( sw != None ){
+					if( state&ShiftMask ){
+						system("closecurwin &");
 					}else{
+						XSetInputFocus(dpy, sw, RevertToPointerRoot, CurrentTime);
 					}
-				break;
+				}else{
+					system("fallmenu_scripts &");
+				}
+			break;
 
-				case 3 :
-					if( sw != None ){
-						mouse_flags[MouseWinResizeFlag] = true ;
-						mouse_flags[MouseWinMoveFlag] = false ;
-					}else{
-					}
-				break;
+			case 3 :
+				if( sw != None ){
+					setonlyflag(mouse_flags, MouseFlagsLength, MouseWinResizeFlag);
+				}else{
+					system("fallmenu_scripts &");
+				}
+			break;
 
-				case 4 :
-					if( sw != None ){
-						XRaiseWindow(dpy, sw);
+			case 4 :
+				if( sw != None ){
+					XRaiseWindow(dpy, sw);
+				}else{
+					if( state&ShiftMask ){
+						moveallwins(dpy, rw, DESKTOP_SCROLLING_SPEED, 0);
 					}else{
+						moveallwins(dpy, rw, 0, DESKTOP_SCROLLING_SPEED);
 					}
-				break;
+				}
+			break;
 					
-				case 5 :
-					if( sw != None ){
-						XLowerWindow(dpy, sw);
+			case 5 :
+				if( sw != None ){
+					XLowerWindow(dpy, sw);
+				}else{
+					if( state&ShiftMask ){
+						moveallwins(dpy, rw, -DESKTOP_SCROLLING_SPEED, 0);
+
 					}else{
+						moveallwins(dpy, rw, 0, -DESKTOP_SCROLLING_SPEED);
 					}
-				break;
+				}
+			break;
 
 			}
-		}else if(ev.type == ButtonRelease) {
+		break;
+
+		case ButtonRelease :
 			but = ev.xbutton.button ;
 			sw = ev.xbutton.subwindow ;
-			XUngrabPointer(dpy, CurrentTime);
+
 			switch(but){
-					case 1 :
-						if( sw != None ){
-							mouse_flags[MouseWinMoveFlag] = false ;
-						}else{
-						}
-					break;
+			case 1 :
+				if( sw != None ){
+					setonlyflag(mouse_flags, MouseFlagsLength, MouseEmptyFlag) ;
+				}else{
+				}
+			break;
 
-					case 2 :
-						if( sw != None){
-						}else{
-						}
-					break;
+			case 2 :
+				if( sw != None){
+				}else{
+				}
+			break;
 
-					case 3 :
-						if( sw != None ){
-							mouse_flags[MouseWinResizeFlag] = false ;
-						}else{
-						}
-					break;
+			case 3 :
+				if( sw != None ){
+					setonlyflag(mouse_flags, MouseFlagsLength, MouseEmptyFlag) ;
+				}else{
+				}
+			break;
 
-					case 4 :
-						if( sw != None ){
-						}else{
-						}
-					break;
+			case 4 :
+				if( sw != None ){
+				}else{
+				}
+			break;
 					
-					case 5 :
-						if( sw != None ){
-						}else{
-						}
-					break;
+			case 5 :
+				if( sw != None ){
+				}else{
+				}
+			break;
 			}
-		} else if( ev.type == MotionNotify ) {
-			/* Window resizing. */
-			int xdiff, ydiff;
+			XUngrabPointer(dpy, CurrentTime);
+		break;
+
+		case MotionNotify :
 			while(XCheckTypedEvent(dpy, MotionNotify, &ev))
-				;
+				/* Buffer skipping. */ ;
+			sw = ev.xmotion.window ;
 			xdiff = ev.xbutton.x_root - start.x_root ;
 			ydiff = ev.xbutton.y_root - start.y_root ;
-			XMoveResizeWindow(dpy, ev.xmotion.window,
-				attr.x + (mouse_flags[MouseWinMoveFlag] ? xdiff : 0),
-				attr.y + (mouse_flags[MouseWinMoveFlag] ? ydiff : 0 ),
-				MAX(1, attr.width + (mouse_flags[MouseWinResizeFlag] ? xdiff : 0)),
-				MAX(1, attr.height + (mouse_flags[MouseWinResizeFlag] ? ydiff : 0)) );
-		} 
+			if( mouse_flags[MouseWinMoveFlag] ){
+				/* Moving about just one window. */
+				XMoveWindow(dpy, sw, attr.x+xdiff, attr.y+ydiff);
+			}else if( mouse_flags[MouseWinResizeFlag]){
+				/* Resizing with protection from oversizing. */
+				XResizeWindow(dpy, sw,
+					MAX(1, attr.width+xdiff ),
+					MAX(1, attr.height+ydiff) );
+			}else if( mouse_flags[MouseAllWinsMoveFlag]) {
+				/* The way we can move all the desktop, so we don't need 
+					multiple work areas, we have just one
+				 	global. */
+				moveallwins(dpy, rw, xdiff, ydiff);
+			}
+		break;
+		}
 	}
+	success_exit:
 	XCloseDisplay(dpy);
-	return 0 ;
+	return EXIT_SUCCESS ;
 }
