@@ -9,7 +9,7 @@ Usage:
 	With pointed window:
 		Button1 - drag: interactively move pointed window.
 		Button2 - focus input on pointed window.
-		Shift+Button2 - call the "closecurwin" wrapper.
+		Shift+Button2 - close current window.
 		MouseWheelUp - raise pointed window in the stack.
 		MouseWheeDown - lower pointed window in the stack.
 		Button3 - drag: interactive window resize.
