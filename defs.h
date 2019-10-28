@@ -16,8 +16,8 @@
 	#define NATIVE_HOTKEY_STR ("backspace")
 /* Exits the wm. */
 	#define QUIT_WM_HOTKEY_STR ("Escape")
-/* Set focus to window. */
-	#define SET_INPUT_FOCUS_HOTKEY_STR ("F1")
+/* Move all window in zero point. */
+	#define ZERO_POINT_WINDOWS_HOTKEY_STR ("Return")
 /* All the hotkeys work with this modiffication key. */
 	/* Mod4Mask = Super/Win key. */
 	#define MODKEY (Mod4Mask)
