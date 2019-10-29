@@ -100,7 +100,7 @@ void killwin(Display *dpy, Window win, Atom *wmatom){
 int xerrorotherwm(Display *dpy, XErrorEvent *ee){
 	/* Startup Error handler to check if another window manager
 		is already running. */
-	fputs(stderr, "wm: Another window manager is already running.");
+	fputs("wm: Another window manager is already running.", stderr);
 	exit(1);
 	return -1 ;
 }
@@ -142,22 +142,46 @@ void grabmodbutton(Display *dpy, Window rw, int button){
           	GrabModeAsync, None, None );
 	XGrabButton( dpy, button, MODKEY|ShiftMask, rw, True, ButtonPressMask|ButtonReleaseMask, GrabModeAsync,
           	GrabModeAsync, None, None );
+	XGrabButton( dpy, button, MODKEY|ControlMask, rw, True, ButtonPressMask|ButtonReleaseMask, GrabModeAsync,
+          	GrabModeAsync, None, None );
+}
+void addexcwin(Window win, Window exc[], int *len){
+	for( int i=0 ; i<*len ; ++i ){
+		if(! exc[i] ){ exc[i] = win ; return ;}
+	}
+	exc[*len] = win ; ++*len ;
 }
 
-void movewinarr(Display *dpy, Window wins[], int len, int xdiff, int ydiff){
+void delexcwin(Window win, Window exc[], int *len){
+	for( int i=0 ; i<*len ; ++i ){
+		if( exc[i]==win ){ exc[i] = 0 ; return; }
+	}
+	if( exc[*len-1]==0 ){
+		--*len ;
+	}
+}
+bool iswininarr(Window win, Window wins[], int len){
+	for( int i=0 ; i<len ; ++i ){ 
+		if( win==wins[i] ){ return true ; }
+	}
+	return false ;
+}
+void movewinarrexc(Display *dpy, Window wins[], int wins_len, Window exc[], int *exc_len, int xdiff, int ydiff){
 	XWindowAttributes attr;
-	for( int i=0 ; i<len ; ++i ){
-		XGetWindowAttributes(dpy, wins[i], &attr);
-		XMoveWindow(dpy, wins[i], attr.x+xdiff, attr.y+ydiff);
+	for( int i=0 ; i<wins_len ; ++i ){
+		if(! iswininarr(wins[i], exc, *exc_len) ){
+			XGetWindowAttributes(dpy, wins[i], &attr);
+			XMoveWindow(dpy, wins[i], attr.x+xdiff, attr.y+ydiff);
+		}
 	}
 }
 
-int moveallwins(Display *dpy, Window rw, int xdiff, int ydiff){
+int moveallwins(Display *dpy, Window rw, Window exc[], int *exc_len, int xdiff, int ydiff){
 	Window dw;
 	Window *wins;
-	unsigned int n;
-	if(! XQueryTree(dpy, rw, &dw, &dw,&wins, &n ) ){ return 1; }
-	movewinarr(dpy, wins, n, xdiff, ydiff);
+	unsigned int wins_len;
+	if(! XQueryTree(dpy, rw, &dw, &dw,&wins, &wins_len ) ){ return 1; }
+	movewinarrexc(dpy, wins, wins_len, exc, exc_len, xdiff, ydiff);
 	XFree(wins);
 	return 0 ;
 }
@@ -176,6 +200,9 @@ int main(int argc, char argv[]){
 	setonlyflag(mouse_flags, MouseFlagsLast, MouseEmptyFlag);
 	/* Subwindow. */
 	Window sw;
+	/* Except to move windows. */
+	Window exc[MAX_WINDOWS];
+	int exc_len = 0 ;
 	/* Buffer to get window attributes. */
 	XWindowAttributes attr;
 	/* Buffer to remember delta cursor-X and cursor-Y. */
@@ -237,7 +264,7 @@ int main(int argc, char argv[]){
 			sw = ev.xkey.subwindow ;
 			if( key == menu_cmd_key){
 				/* The only way to call programs. */
-				system("menu_cmd &");
+				system("t &");
 			}else if( key == dvorak_key ){
 				system("setxkbmap $DVORAK_KEYBOARD_LAYOUT ; xmodmap $XMODMAP ");
 			}else if( key == dvp_key ){
@@ -272,46 +299,57 @@ int main(int argc, char argv[]){
 			break;
 
 			case 2 :
-				if( sw != None ){
 					if( state&ShiftMask ){
-						killwin(dpy, sw, wmatom);
+						if( sw != None ){
+							killwin(dpy, sw, wmatom);
+						}else{
+						}
+					}else if( state&ControlMask ){
+						if( sw != None ){
+							if( iswininarr(sw, exc, exc_len) ){
+								delexcwin(sw, exc, &exc_len);
+							}else{
+								addexcwin(sw, exc, &exc_len);
+							}
+						}else{
+						}
 					}else{
-						setfocus(dpy, rw,  sw, wmatom, netatom);
+						if( sw != None ){
+							setfocus(dpy, rw,  sw, wmatom, netatom);
+						}else{
+						}
 					}
-				}else{
-					system("fallmenu_scripts &");
-				}
 			break;
 
 			case 3 :
 				if( sw != None ){
 					setonlyflag(mouse_flags, MouseFlagsLast, MouseWinResizeFlag);
 				}else{
-					system("fallmenu_scripts &");
 				}
 			break;
 
 			case 4 :
-				if( sw != None ){
-					XRaiseWindow(dpy, sw);
+				if( state&ShiftMask ){
+					moveallwins(dpy, rw, exc, &exc_len, DESKTOP_SCROLLING_SPEED, 0);
+				}else if( state&ControlMask ){
+					moveallwins(dpy, rw, exc, &exc_len, 0, DESKTOP_SCROLLING_SPEED);
 				}else{
-					if( state&ShiftMask ){
-						moveallwins(dpy, rw, DESKTOP_SCROLLING_SPEED, 0);
+					if( sw != None ){
+						XRaiseWindow(dpy, sw);
 					}else{
-						moveallwins(dpy, rw, 0, DESKTOP_SCROLLING_SPEED);
 					}
 				}
 			break;
 					
 			case 5 :
-				if( sw != None ){
-					XLowerWindow(dpy, sw);
+				if( state&ShiftMask ){
+					moveallwins(dpy, rw, exc, &exc_len, -DESKTOP_SCROLLING_SPEED, 0);
+				}else if( state&ControlMask ){
+					moveallwins(dpy, rw, exc, &exc_len, 0, -DESKTOP_SCROLLING_SPEED);
 				}else{
-					if( state&ShiftMask ){
-						moveallwins(dpy, rw, -DESKTOP_SCROLLING_SPEED, 0);
-
+					if( sw != None ){
+						XLowerWindow(dpy, sw);
 					}else{
-						moveallwins(dpy, rw, 0, -DESKTOP_SCROLLING_SPEED);
 					}
 				}
 			break;
@@ -373,7 +411,7 @@ int main(int argc, char argv[]){
 					MAX(1, attr.width+xdiff ),
 					MAX(1, attr.height+ydiff) );
 			}else if( mouse_flags[MouseAllWinsMoveFlag]) {
-				moveallwins(dpy, rw, xdiff, ydiff);
+				moveallwins(dpy, rw, exc, &exc_len, xdiff, ydiff);
 			}
 		break;
 		}

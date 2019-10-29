@@ -22,4 +22,5 @@
 	/* Mod4Mask = Super/Win key. */
 	#define MODKEY (Mod4Mask)
 
+#define MAX_WINDOWS 1024
 #endif /* __DEFSH */
