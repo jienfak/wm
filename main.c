@@ -160,23 +160,25 @@ void delexcwin(Window win, Window exc[], int *len){
 		--*len ;
 	}
 }
+
 bool iswininarr(Window win, Window wins[], int len){
 	for( int i=0 ; i<len ; ++i ){ 
 		if( win==wins[i] ){ return true ; }
 	}
 	return false ;
 }
-void movewinarrexc(Display *dpy, Window wins[], int wins_len, Window exc[], int *exc_len, int xdiff, int ydiff){
-	XWindowAttributes attr;
+
+void movewinarrexc(Display *dpy, Window wins[], int wins_len, Window exc[], int exc_len, int xdiff, int ydiff){
 	for( int i=0 ; i<wins_len ; ++i ){
-		if(! iswininarr(wins[i], exc, *exc_len) ){
-			XGetWindowAttributes(dpy, wins[i], &attr);
-			XMoveWindow(dpy, wins[i], attr.x+xdiff, attr.y+ydiff);
+		XWindowAttributes attr;
+		Window win = wins[i] ;
+		if(! iswininarr(win, exc, exc_len) ){
+			XGetWindowAttributes(dpy, win, &attr);
+			XMoveWindow(dpy, win, attr.x+xdiff, attr.y+ydiff);
 		}
 	}
 }
-
-int moveallwins(Display *dpy, Window rw, Window exc[], int *exc_len, int xdiff, int ydiff){
+int moveallwins(Display *dpy, Window rw, Window exc[], int exc_len, int xdiff, int ydiff){
 	Window dw;
 	Window *wins;
 	unsigned int wins_len;
@@ -241,9 +243,9 @@ int main(int argc, char argv[]){
 		dvp_key = grabmodkey(dpy, rw, DVP_HOTKEY_STR) ,
 		qwerty_key = grabmodkey(dpy, rw, QWERTY_HOTKEY_STR) ,
 		native_key = grabmodkey(dpy, rw, NATIVE_HOTKEY_STR) ,
-		quit_wm_key = grabmodkey(dpy, rw, QUIT_WM_HOTKEY_STR)
+		quit_wm_key = grabmodkey(dpy, rw, QUIT_WM_HOTKEY_STR),
+		zero_point_windows_hotkey = grabmodkey(dpy, rw, ZERO_POINT_WINDOWS_HOTKEY_STR)
 	;
-	
 
 	/* Mouse bindings. */
 	grabmodbutton(dpy, rw, 1);
@@ -282,19 +284,16 @@ int main(int argc, char argv[]){
 			but = ev.xbutton.button ;
 			sw = ev.xbutton.subwindow ;
 			state = ev.xbutton.state ;
-			if(sw != None){
-				XGrabPointer( dpy, sw, True,
-					PointerMotionMask|ButtonReleaseMask, GrabModeAsync,
-					GrabModeAsync, None, cur, CurrentTime );
-				XGetWindowAttributes(dpy, sw, &attr);
-			}
 			start = ev.xbutton ;
 			switch( but ){
 			case 1 :
 				if( sw != None ){
 					setonlyflag(mouse_flags, MouseFlagsLast, MouseWinMoveFlag);
+					XGrabPointer( dpy, sw, True,
+						PointerMotionMask|ButtonReleaseMask, GrabModeAsync,
+						GrabModeAsync, None, cur, CurrentTime );
+					XGetWindowAttributes(dpy, sw, &attr);
 				}else{
-					setonlyflag(mouse_flags, MouseFlagsLast, MouseAllWinsMoveFlag);
 				}
 			break;
 
@@ -324,15 +323,19 @@ int main(int argc, char argv[]){
 			case 3 :
 				if( sw != None ){
 					setonlyflag(mouse_flags, MouseFlagsLast, MouseWinResizeFlag);
+					XGrabPointer( dpy, sw, True,
+						PointerMotionMask|ButtonReleaseMask, GrabModeAsync,
+						GrabModeAsync, None, cur, CurrentTime );
+					XGetWindowAttributes(dpy, sw, &attr);
 				}else{
 				}
 			break;
 
 			case 4 :
 				if( state&ShiftMask ){
-					moveallwins(dpy, rw, exc, &exc_len, DESKTOP_SCROLLING_SPEED, 0);
+					moveallwins(dpy, rw, exc, exc_len, DESKTOP_SCROLLING_SPEED, 0);
 				}else if( state&ControlMask ){
-					moveallwins(dpy, rw, exc, &exc_len, 0, DESKTOP_SCROLLING_SPEED);
+					moveallwins(dpy, rw, exc, exc_len, 0, DESKTOP_SCROLLING_SPEED);
 				}else{
 					if( sw != None ){
 						XRaiseWindow(dpy, sw);
@@ -343,9 +346,9 @@ int main(int argc, char argv[]){
 					
 			case 5 :
 				if( state&ShiftMask ){
-					moveallwins(dpy, rw, exc, &exc_len, -DESKTOP_SCROLLING_SPEED, 0);
+					moveallwins(dpy, rw, exc, exc_len, -DESKTOP_SCROLLING_SPEED, 0);
 				}else if( state&ControlMask ){
-					moveallwins(dpy, rw, exc, &exc_len, 0, -DESKTOP_SCROLLING_SPEED);
+					moveallwins(dpy, rw, exc, exc_len, 0, -DESKTOP_SCROLLING_SPEED);
 				}else{
 					if( sw != None ){
 						XLowerWindow(dpy, sw);
@@ -353,20 +356,18 @@ int main(int argc, char argv[]){
 					}
 				}
 			break;
-
 			}
 		break;
 
 		case ButtonRelease :
 			but = ev.xbutton.button ;
-			sw = ev.xbutton.subwindow ;
+			/*sw = ev.xbutton.subwindow ;*/
 
 			switch(but){
 			case 1 :
 				if( sw != None ){
 					setonlyflag(mouse_flags, MouseFlagsLast, MouseEmptyFlag) ;
 				}else{
-					setonlyflag(mouse_flags, MouseFlagsLast, MouseEmptyFlag);
 				}
 			break;
 
@@ -395,7 +396,9 @@ int main(int argc, char argv[]){
 				}
 			break;
 			}
-			XUngrabPointer(dpy, CurrentTime);
+			if( sw != None ){
+				XUngrabPointer(dpy, CurrentTime);
+			}
 		break;
 
 		case MotionNotify :
@@ -410,8 +413,6 @@ int main(int argc, char argv[]){
 				XResizeWindow(dpy, sw,
 					MAX(1, attr.width+xdiff ),
 					MAX(1, attr.height+ydiff) );
-			}else if( mouse_flags[MouseAllWinsMoveFlag]) {
-				moveallwins(dpy, rw, exc, &exc_len, xdiff, ydiff);
 			}
 		break;
 		}
