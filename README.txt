@@ -28,5 +28,5 @@ Usage:
 			a - set keyboard layout to "QWERTY_KEYBOARD_LAYOUT".
 			Return - set keyboard layout to "$DVP_KEYBOARD_LAYOUT" .
 			Backspace - set keyboard layout to "$NATIVE_KEYBOARD_LAYOUT".
-			Space - call cmd-caller program(Usually it calls terminal).
+			Space - call cmd-caller program(Usually it calls terminal(my standard handler for dumb-terminals is "t")).
 			Esc - quit WM.
