@@ -1,10 +1,11 @@
 #ifndef __DEFSH
 #define __DEFSH
 /* Keybindings to change, if you need it. */
-
+/* Execute with "system" function from standard library. */
+	#define CMD_HANDLER_STR ("t")
 /* In pixels. */
 	#define DESKTOP_SCROLLING_SPEED (150)
-/* It calls your 'menu_cmd' wrapper. */
+/* It calls your "CMD_HANDLER_STR" by "system". */
 	#define XMENU_CMD_HOTKEY_STR ("space")
 /* Sets layout to $DVORAK_KEYBOARD_LAYOUT. */
 	#define DVORAK_HOTKEY_STR ("Tab")

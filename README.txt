@@ -15,19 +15,19 @@ Usage:
 			[none] - focus input on pointed window.
 			Control- toggle moving or not via MouseWheel[Up|Down]+[Shift|Control].
 			Shift - close current window.
-		MouseWheelUp - scroll to the right.
+		MouseWheelUp:
 			[none] - raise pointed window in the stack.
 			Shift - scroll to the left.
 			Control - scroll up.
 		MouseWheeDown:
 			Shift  - scroll to the right.
 			Control - scroll down.
-	Keybindings:
-		Tab - set keyboard layout to "$DVORAK_KEYBOARD_LAYOUT".
-		a - set keyboard layout to "QWERTY_KEYBOARD_LAYOUT".
-		Return - set keyboard layout to "$DVP_KEYBOARD_LAYOUT" .
-		Backspace - set keyboard layout to "$NATIVE_KEYBOARD_LAYOUT".
-		Space - call "t" wrapper(Usually it calls terminal).
-		Esc - quit WM.
+		Keybindings:
+			Tab - set keyboard layout to "$DVORAK_KEYBOARD_LAYOUT".
+			a - set keyboard layout to "QWERTY_KEYBOARD_LAYOUT".
+			Return - set keyboard layout to "$DVP_KEYBOARD_LAYOUT" .
+			Backspace - set keyboard layout to "$NATIVE_KEYBOARD_LAYOUT".
+			Space - call cmd-caller program(Usually it calls terminal).
+			Esc - quit WM.
 
 	

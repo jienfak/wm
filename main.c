@@ -265,8 +265,8 @@ int main(int argc, char argv[]){
 			key = ev.xkey.keycode ;
 			sw = ev.xkey.subwindow ;
 			if( key == menu_cmd_key){
-				/* The only way to call programs. */
-				system("t &");
+				/* The only way to call programs. Because hotkeys suck. */
+				system(CMD_HANDLER_STR);
 			}else if( key == dvorak_key ){
 				system("setxkbmap $DVORAK_KEYBOARD_LAYOUT ; xmodmap $XMODMAP ");
 			}else if( key == dvp_key ){
