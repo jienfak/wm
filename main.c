@@ -21,6 +21,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdbool.h>
+#include <unistd.h>
 #include "defs.h"
 
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
@@ -83,6 +84,22 @@ int sendevent(Display *dpy, Window win, Atom *wmatom, Atom proto){
 		XSendEvent(dpy, win, False, NoEventMask, &ev) ;
 	}
 	return exists ;
+}
+void spawn(char *cmd)
+{	
+	char *arg[4];
+	char *sh = "/bin/sh" ;
+	arg[0] = "sh" ;
+	arg[1] = "-c" ;
+	arg[2] = cmd ;
+	arg[3] = NULL ;
+	if (fork() == 0) {
+		setsid();
+		execvp(sh, arg);
+		fprintf(stderr, "wm: execvp %s", cmd);
+		perror(" failed");
+		exit(EXIT_SUCCESS);
+	}
 }
 
 void killwin(Display *dpy, Window win, Atom *wmatom){
@@ -264,17 +281,17 @@ int main(int argc, char argv[]){
 			/* Super key is pressed. */ 
 			key = ev.xkey.keycode ;
 			sw = ev.xkey.subwindow ;
-			if( key == menu_cmd_key){
+			if( key == menu_cmd_key ){
 				/* The only way to call programs. Because hotkeys suck. */
-				system(CMD_HANDLER_STR);
+				spawn(CMD_HANDLER_STR);
 			}else if( key == dvorak_key ){
-				system("setxkbmap $DVORAK_KEYBOARD_LAYOUT ; xmodmap $XMODMAP ");
+				spawn( "setxkbmap $DVORAK_KEYBOARD_LAYOUT ; xmodmap $XMODMAP ");
 			}else if( key == dvp_key ){
-				system("setxkbmap $DVP_KEYBOARD_LAYOUT ; xmodmap $XMODMAP ");
+				spawn("setxkbmap $DVP_KEYBOARD_LAYOUT ; xmodmap $XMODMAP ");
 			}else if( key == native_key ){
-				system("setxkbmap $NATIVE_KEYBOARD_LAYOUT ; xmodmap $XMODMAP ");
+				spawn("setxkbmap $NATIVE_KEYBOARD_LAYOUT ; xmodmap $XMODMAP ");
 			}else if( key == qwerty_key ){
-				system("setxkbmap $QWERTY_KEYBOARD_LAYOUT ; xmodmap $XMODMAP");
+				spawn("setxkbmap $QWERTY_KEYBOARD_LAYOUT ; xmodmap $XMODMAP");
 			}else if( key == quit_wm_key ){
 				goto success_exit ;
 			}

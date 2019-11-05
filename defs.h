@@ -1,7 +1,7 @@
 #ifndef __DEFSH
 #define __DEFSH
 /* Keybindings to change, if you need it. */
-/* Execute with "system" function from standard library. */
+/* Execute with "/bin/sh" on XMENU_CMD_KEY_STR pressing. */
 	#define CMD_HANDLER_STR ("t")
 /* In pixels. */
 	#define DESKTOP_SCROLLING_SPEED (150)
