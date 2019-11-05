@@ -1,10 +1,11 @@
 # wm
 Windows mover. It can move windows.
-
-Compile it with something smaller than GCC(I use TCC).
-To modify keybindings look 'defs.h'.
-My wrappers for standard commands you can find in "github.com/jienfak/etc/alias".
 Based on TinyWM. Some code is taken from the DWM. Suckless team - thanks.
+Instalation:
+	$ [edit 'config.mk' to choose compiler on your machine(Default is choosed TCC).]]
+	$ [modify keybindings in 'defs.h' if you need and change CMD-caller.]
+	$ make
+	# make install
 Usage:
 	Every key is used with MODKEY only. Default MODKEY is 'Super' key.
 		Button1:
@@ -29,5 +30,3 @@ Usage:
 			Backspace - set keyboard layout to "$NATIVE_KEYBOARD_LAYOUT".
 			Space - call cmd-caller program(Usually it calls terminal).
 			Esc - quit WM.
-
-	
