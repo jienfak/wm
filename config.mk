@@ -1,6 +1,6 @@
 # Includable for c1-like makefiles.
 PROGNAME= $(notdir $(patsubst %/,%,$(dir $(abspath $(firstword $(MAKEFILE_LIST)) ))))
-VERSION = 0.4
+VERSION = 0.41
 # Artifacts.
 TGT     = $(PROGNAME)$(EXEEXT)
 SRC     = $(wildcard *.c) $(ADDSRC)

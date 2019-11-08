@@ -143,6 +143,7 @@ void setonlyflag(bool flags[], int len, int flag){
 	for( int i=0 ; i<len ; ++i ){ flags[i] = false ; }
 	flags[flag] = true ;
 }
+
 unsigned int strkey(Display *dpy, char *str){
 	return XKeysymToKeycode(dpy, XStringToKeysym(str)) ;
 }
@@ -260,8 +261,7 @@ int main(int argc, char argv[]){
 		dvp_key = grabmodkey(dpy, rw, DVP_HOTKEY_STR) ,
 		qwerty_key = grabmodkey(dpy, rw, QWERTY_HOTKEY_STR) ,
 		native_key = grabmodkey(dpy, rw, NATIVE_HOTKEY_STR) ,
-		quit_wm_key = grabmodkey(dpy, rw, QUIT_WM_HOTKEY_STR),
-		zero_point_windows_hotkey = grabmodkey(dpy, rw, ZERO_POINT_WINDOWS_HOTKEY_STR)
+		quit_wm_key = grabmodkey(dpy, rw, QUIT_WM_HOTKEY_STR)
 	;
 
 	/* Mouse bindings. */
