@@ -1,5 +1,5 @@
 # wm
-Windows mover. It can move windows.
+Windows mover. It can move windows. Ideas from this project are implemented in DWM now. (https://github.com/jienfak/vvm)
 Based on TinyWM. Some code is taken from the DWM. Suckless team - thanks.
 Instalation:
 	$ [edit 'config.mk' to choose compiler on your machine(Default is choosed TCC).]]
